@@ -1,29 +1,39 @@
+const express = require('express');
+const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
+const { mergePdfs } = require('./merge');
 
-const express = require('express')
-const path = require('path')
-const app = express()
-const multer  = require('multer')
-const {mergePdfs}  = require('./merge')
+const app = express();
+const upload = multer({ dest: 'uploads/' });
 
-const upload = multer({ dest: 'uploads/' })
-app.use('/static', express.static('public'))
-const port = 3002
+// serve merged files
+app.use('/static', express.static(path.join(__dirname, 'public')));
+
+const port = process.env.PORT || 3002;
+
+// debug: confirm index exists in container
+console.log('INDEX PATH:', path.join(__dirname, 'templates', 'index.html'), 'exists=', fs.existsSync(path.join(__dirname, 'templates', 'index.html')));
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, "templates/index.html"))
-})
+  res.sendFile(path.join(__dirname, 'templates', 'index.html'));
+});
 
-app.post('/merge', upload.array('pdfs', 12), async (req, res, next)=> {
-  console.log(req.files)
-  let d = await mergePdfs(path.join(__dirname, req.files[0].path),path.join(__dirname, req.files[1].path))
-  res.redirect('http://localhost:3002/static/${d}.pdf')
-  //res.send({data: req.files})
-  // req.files is array of `photos` files
-  // req.body will contain the text fields, if there were any
-})
-
+app.post('/merge', upload.array('pdfs', 12), async (req, res) => {
+  try {
+    console.log('FILES:', req.files);
+    const output = await mergePdfs(
+      path.join(__dirname, req.files[0].path),
+      path.join(__dirname, req.files[1].path)
+    );
+    console.log('Output file:', output);
+    return res.redirect(`/static/${output}`);            // ← use backticks or plain string with variable interpolation
+  } catch (err) {
+    console.error('POST /merge error:', err);
+    return res.status(500).send('Server error');
+  }
+});
 
 app.listen(port, () => {
-  console.log(`Example app listening on port http://localhost:${port}`)
-
-}) 
+  console.log(`Server running at http://localhost:${port}`);
+});
